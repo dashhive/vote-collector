@@ -26,6 +26,7 @@ type server struct {
 	candidatesMux       *sync.RWMutex
 	candidates          []Candidate
 	votingAddresses     []string
+	mnList              map[string]MNInfo
 	candidatesUpdatedAt time.Time
 	votingStart         time.Time
 	votingEnd           time.Time
@@ -33,7 +34,14 @@ type server struct {
 
 // MNInfo represents the voting keys of the nodes
 type MNInfo struct {
-	VotingAddress string `json:"votingaddress"`
+	VotingAddress     string `json:"votingaddress"`
+	OwnerAddress      string `json:"owneraddress"`
+	CollateralAddress string `json:"collateraladdress"`
+	Status            string `json:"status"`
+	// not using any of:
+	//   "proTxHash", "address", "payee",
+	//   "lastpaidtime", "lastpaidblock",
+	//   "pubkeyoperator"
 }
 
 // envCheck is called upon startup to ensure the required environment variables

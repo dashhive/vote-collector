@@ -38,6 +38,7 @@ func (s *server) routes() {
 
 	s.router.HandleFunc("/api/candidates", s.handleCandidates())
 	s.router.HandleFunc("/api/votingaddresses", s.handleVotingAddresses())
+	s.router.HandleFunc("/api/mnlist", s.handleMNList())
 
 	// audit routes
 	// the public can view all votes once the voting has concluded
@@ -105,16 +106,29 @@ func (s *server) updateLists() error {
 		// TODO: we want a way to signal this, yeah?
 		return err
 	}
-	s.votingAddresses = s.getMNList()
+
+	// TODO handle error
+	mnList := s.getMNList()
+
+	// TODO keep track of voting key weight map[string][]string
+	// (i.e. map[votingaddr][]collateraladdr)
+	votingAddresses := []string{}
+	for _, v := range mnList {
+		votingAddresses = append(votingAddresses, v.VotingAddress)
+	}
+
+	now := time.Now()
 
 	s.candidatesMux.Lock()
-	s.candidatesUpdatedAt = time.Now()
+	s.mnList = mnList
+	s.votingAddresses = votingAddresses
+	s.candidatesUpdatedAt = now
 	s.candidates = candidates
 	s.candidatesMux.Unlock()
 	return nil
 }
 
-func (s *server) getMNList() []string {
+func (s *server) getMNList() map[string]MNInfo {
 	c := &http.Client{
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
@@ -157,11 +171,7 @@ func (s *server) getMNList() []string {
 		return nil
 	}
 
-	votingAddresses := []string{}
-	for _, v := range mninfo {
-		votingAddresses = append(votingAddresses, v.VotingAddress)
-	}
-	return votingAddresses
+	return mninfo
 }
 
 // handleCandidates handles the candidates route
@@ -193,7 +203,7 @@ func (s *server) handleCandidates() http.HandlerFunc {
 	}
 }
 
-// handleCandidates handles the candidates route
+// handleVotingAddresses handles the voting keys route
 func (s *server) handleVotingAddresses() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var ourAddrs []string
@@ -207,6 +217,24 @@ func (s *server) handleVotingAddresses() http.HandlerFunc {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(ourAddrs)
+	}
+}
+
+// handleMNList handles the full mnlist
+func (s *server) handleMNList() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var ourMNList map[string]MNInfo
+
+		s.candidatesMux.RLock()
+		ourMNList = s.mnList
+		s.candidatesMux.RUnlock()
+
+		// Return response
+		w.Header().Set("Content-Type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(ourMNList)
+
 	}
 }
 
