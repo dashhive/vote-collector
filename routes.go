@@ -107,8 +107,21 @@ func (s *server) updateLists() error {
 		return err
 	}
 
+	now := time.Now()
+
+	var mnList map[string]MNInfo
+
+	s.candidatesMux.RLock()
 	// TODO handle error
-	mnList := s.getMNList()
+	if s.candidatesUpdatedAt.Sub(s.votingEnd) > 0 && len(s.mnList) > 0 {
+		mnList = s.mnList
+	} else {
+		if s.candidatesUpdatedAt.Sub(s.votingEnd) > 0 {
+			fmt.Fprintf(os.Stderr, "BUG: Updating mnlist AFTER vote has closed (TODO fix)")
+		}
+		mnList = s.getMNList()
+	}
+	s.candidatesMux.RUnlock()
 
 	// TODO keep track of voting key weight map[string][]string
 	// (i.e. map[votingaddr][]collateraladdr)
@@ -116,8 +129,6 @@ func (s *server) updateLists() error {
 	for _, v := range mnList {
 		votingAddresses = append(votingAddresses, v.VotingAddress)
 	}
-
-	now := time.Now()
 
 	s.candidatesMux.Lock()
 	s.mnList = mnList
